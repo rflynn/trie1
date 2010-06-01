@@ -1,0 +1,15 @@
+
+$ python setup.py build
+$ sudo python setup.py install
+$ ./test.py
+
+$ python -i
+
+>>> from trie1 import trie1
+>>> t = trie1()
+>>> t.add(u'a')
+>>> t.find(u'a')
+True
+>>> t.add(u'ab')
+>>> 
+
