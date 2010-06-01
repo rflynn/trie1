@@ -19,6 +19,7 @@ typedef struct {
 
 static void      trie1py_dealloc(PyObject *self);
 static PyObject *trie1py_getattr(PyObject *self, char *attr);
+static int       trie1py_print  (PyObject *self, FILE *fp, int flags);
 
 PyTypeObject trie1py_Type = {
 	PyObject_HEAD_INIT(&PyType_Type)
@@ -27,7 +28,7 @@ PyTypeObject trie1py_Type = {
 	sizeof(trie1py),	/* int tp_basicsize;                        */
 	0,			/* int tp_itemsize; not used much           */
 	trie1py_dealloc,	/* destructor tp_dealloc;                   */
-	0,//trie1py_print,	/* printfunc tp_print;                      */
+	trie1py_print,		/* printfunc tp_print;                      */
 	trie1py_getattr,	/* getattrfunc tp_getattr;	__getattr__ */
 	0,//trie1py_setattr,	/* setattrfunc tp_setattr;	__setattr__ */
 	0,//trie1py_compare,	/* cmpfunc tp_compare;		__cmp__     */
@@ -51,6 +52,7 @@ static PyMethodDef trie1py_Methods[] = {
 	{"add",			trie1py_add,			METH_VARARGS,	""  },
 	{"delete",		trie1py_del,			METH_VARARGS,	""  },
 	{"find",		trie1py_find,			METH_VARARGS,	""  },
+	{"__contains__",	trie1py_find,			METH_VARARGS,	""  },
 	{"walk_prefix_strings",	trie1py_walk_prefix_strings,	METH_VARARGS,	""  },
 	{"all_prefix_strings",	trie1py_all_prefix_strings,	METH_VARARGS,	""  },
 	{NULL,			NULL,				0,		NULL}
@@ -66,12 +68,17 @@ PyMODINIT_FUNC inittrie1(void)
 	(void) Py_InitModule("trie1", module_Methods);
 }
 
-
-
 PyObject *trie1py_getattr(PyObject *self, char *attr)
 {
 	PyObject *res = Py_FindMethod(trie1py_Methods, self, attr);
 	return res;
+}
+
+static int trie1py_print(PyObject *self, FILE *fp, int flags)
+{
+	trie1py *pt = (trie1py *)self;
+	trie1_dump(pt->t, fp);
+	return 0;
 }
 
 static PyObject * trie1py_NEW(void)

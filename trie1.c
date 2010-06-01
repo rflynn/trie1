@@ -41,24 +41,29 @@ or implied, of Ryan Flynn.
 static void do_trie1_dump(const struct trie1 *t, FILE *f, unsigned level)
 {
 	/* print node */
-	unsigned l = level;
-	while (l--) /* indent */
-		fputc(' ', f);
-	if (!t->c)
-		fprintf(f, "\\0");
-	else
+	if (t->c)
 		fprintf(f, "%lc", t->c);
-	fputc('\n', f);
+	else if (level > 0)
+		fputc(')', f);
 	/* recurse, but not from sub-'\0' nodes */
 	if (t->c || 0 == level) {
-		if (t->child) do_trie1_dump(t->child, f, level+1);
-		if (t->next) do_trie1_dump(t->next, f, level);
+		if (t->child) {
+			if (t->child->c)
+				fputc('(', f);
+			do_trie1_dump(t->child, f, level+1);
+		}
+	}
+	if (t->next) { /* root \0 will never have a next */
+		fputc(',', f);
+		do_trie1_dump(t->next, f, level);
 	}
 }
 
 void trie1_dump(const struct trie1 *t, FILE *f)
 {
+	fputc('(', f);
 	do_trie1_dump(t, f, 0);
+	fputc(')', f);
 }
 
 static struct trie1 * trie1_alloc(const wchar_t c)
@@ -118,6 +123,11 @@ static struct trie1 * do_trie1_find_or_add(struct trie1 *parent, const wchar_t c
 			if (s == parent->child)
 				parent->child = n;
 		} else {
+			/* if it's an unattached \0 node it's the root;
+			 * we need to allocate a new one so we can modify it
+			 * without corrupting the trie. */
+			if (s == parent->child && !s->c && !s->next)
+				s = parent->child = trie1_alloc(L'\0');
 			n->next = s->next;
 			s->next = n;
 		}
@@ -130,7 +140,16 @@ void trie1_add(struct trie1 *t, const wchar_t *str)
 	struct trie1 *top = t;
 	while (*str)
 		t = do_trie1_find_or_add(t, *str++);
-	t->child = top; /* point all \0 at the same place. brilliant! */
+	/* now insert \0 node... */
+	if (!t->child) {
+		/* point sibling-less \0s at root. genius! */
+		t->child = top;
+	} else if (t->child->c) { /* \0 not already there... */
+		/* insert new \0 sibling */
+		struct trie1 *tmp = trie1_alloc(L'\0');
+		tmp->next = t->child;	
+		t->child = tmp;
+	}
 }
 
 int trie1_find(const struct trie1 *t, const wchar_t *str)
@@ -192,12 +211,15 @@ void trie1_walk_prefix_strings(const struct trie1 *t, const wchar_t *str,
 	const wchar_t *ostr = str;
 	if (*str)
 		t = t->child;
-	do {
+	while (t && *str) {
 		while (t && t->c < *str)
 			t = t->next;
-		if (t && t->child && !t->child->c) /* is full string */
+		if (!t || t->c != *str || !t->child)
+			break;
+ 		if (!t->child->c)
 			f(ostr, (size_t)(str-ostr+1), pass); /* callback */
-	} while (t && *str && (t->c == *str++) && (t = t->child));
+		t = t->child, str++;
+	}
 }
 
 #ifdef DEBUG
@@ -210,9 +232,10 @@ static void print_callback(const wchar_t *str, size_t len, void *v)
 
 int main(void)
 {
-	struct trie1 *t = trie1_new();
+	struct trie1 *t;
 	printf("%s test...\n", __FILE__);
 	printf("sizeof(struct trie1) = %lu\n", sizeof *t);
+ 	t = trie1_new();
 	trie1_dump(t, stdout);
 	/* add/del */
 	trie1_add(t, L"tea");
@@ -248,6 +271,21 @@ int main(void)
  	trie1_walk_prefix_strings(t, L"hello", print_callback, NULL);
  	trie1_walk_prefix_strings(t, L"foobar", print_callback, NULL);
 	trie1_free(t);
+
+	printf("add prefix to existing word... "); fflush(stdout);
+	t = trie1_new();
+	trie1_add(t, L"xy");
+	trie1_dump(t, stdout);
+	assert( trie1_find(t, L"xy"));
+	assert(!trie1_find(t, L"x"));
+	trie1_add(t, L"x");
+	trie1_dump(t, stdout);
+	assert(trie1_find(t, L"xy"));
+	assert(trie1_find(t, L"x"));
+	trie1_dump(t, stdout);
+	trie1_free(t);
+	printf("ok.\n");
+
 	/* test long string */
 	{
 		size_t len = 1024 * 1024;
@@ -256,11 +294,18 @@ int main(void)
 		while (len--)
 			*tmp++ = L'A';
 		*tmp = L'\0';
+		printf("add/find/del long string... "); fflush(stdout);
 		t = trie1_new();
 		trie1_add(t, longstring);
+		assert( trie1_find(t, longstring));
+		assert(!trie1_find(t, longstring+1));
 		trie1_del(t, longstring);
+		free(longstring);
 		trie1_free(t);
+		printf("ok.\n");
 	}
+
+	/* done */
 	printf("test passed.\n");
 	return 0;
 }

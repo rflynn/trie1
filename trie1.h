@@ -18,6 +18,7 @@ struct trie1 {
 };
 
 struct trie1 * trie1_new (void);
+void           trie1_dump(const struct trie1 *, FILE *f);
 void           trie1_free(struct trie1 *);
 void           trie1_add (struct trie1 *,       const wchar_t *);
 int            trie1_find(const struct trie1 *, const wchar_t *);
