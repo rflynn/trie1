@@ -211,7 +211,6 @@ void trie1_walk_prefix_strings(const struct trie1 *t, const wchar_t *str,
 	const wchar_t *ostr = str;
 	if (*str)
 		t = t->child;
-<<<<<<< HEAD:trie1.c
 	while (t && *str) {
 		while (t && t->c < *str)
 			t = t->next;
@@ -219,14 +218,6 @@ void trie1_walk_prefix_strings(const struct trie1 *t, const wchar_t *str,
 			break;
  		if (!t->child->c)
 			f(ostr, (size_t)(str-ostr+1), pass); /* callback */
-=======
-	while (t) {
-		while (t && t->c < *str)
-			t = t->next;
-		if (!t || t->c != *str || !t->child || t->child->c)
-			break;
-		f(ostr, (size_t)(str-ostr+1), pass); /* callback */
->>>>>>> a179c4a6733ae581b7ab432a1c0e55ada5780e18:trie1.c
 		t = t->child, str++;
 	}
 }
