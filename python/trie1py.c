@@ -17,8 +17,8 @@ typedef struct {
 	struct trie1 *t;
 } trie1py;
 
-static void      trie1py_dealloc            (PyObject *self);
-static PyObject *trie1py_getattr            (PyObject *self, char *attr);
+static void      trie1py_dealloc(PyObject *self);
+static PyObject *trie1py_getattr(PyObject *self, char *attr);
 
 PyTypeObject trie1py_Type = {
 	PyObject_HEAD_INIT(&PyType_Type)
@@ -45,12 +45,14 @@ static PyObject *trie1py_add                (PyObject *self, PyObject *args);
 static PyObject *trie1py_find               (PyObject *self, PyObject *args);
 static PyObject *trie1py_del                (PyObject *self, PyObject *args);
 static PyObject *trie1py_walk_prefix_strings(PyObject *self, PyObject *args);
+static PyObject *trie1py_all_prefix_strings (PyObject *self, PyObject *args);
 
 static PyMethodDef trie1py_Methods[] = {
 	{"add",			trie1py_add,			METH_VARARGS,	""  },
 	{"delete",		trie1py_del,			METH_VARARGS,	""  },
 	{"find",		trie1py_find,			METH_VARARGS,	""  },
 	{"walk_prefix_strings",	trie1py_walk_prefix_strings,	METH_VARARGS,	""  },
+	{"all_prefix_strings",	trie1py_all_prefix_strings,	METH_VARARGS,	""  },
 	{NULL,			NULL,				0,		NULL}
 };
 
@@ -156,8 +158,6 @@ static void cb_walk_prefix_strings(const wchar_t *s, size_t slen, void *pass)
 
 static PyObject *trie1py_walk_prefix_strings(PyObject *self, PyObject *args)
 {
-	// void trie1_walk_prefix_strings(const struct trie1 *t, const wchar_t *str,
-        //                               void (*f)(const wchar_t *, size_t len, void *pass), void *pass);
 	PyObject *res = NULL,
 	         *pass = NULL;
 	trie1py *obj = (trie1py *)self;
@@ -176,5 +176,34 @@ static PyObject *trie1py_walk_prefix_strings(PyObject *self, PyObject *args)
 		Py_DECREF(pass);
 	}
 	return res;
+}
+
+
+/*
+ * append all s[:len] to list in pass
+ */
+static void cb_all_prefix_strings(const wchar_t *s, size_t slen, void *pass)
+{
+	PyObject *list = pass,
+	         *args = Py_BuildValue("u#", s, (int)slen);
+	if (args) {
+		(void)PyList_Append(list, args);
+		Py_DECREF(args);
+	}
+}
+
+/*
+ * return a list of all trie entries that match a prefix of a string
+ */
+static PyObject *trie1py_all_prefix_strings(PyObject *self, PyObject *args)
+{
+	PyObject *list = PyList_New(0);
+	trie1py *obj = (trie1py *)self;
+	wchar_t *s;
+	if (PyArg_ParseTuple(args, "u", &s)) {
+		trie1_walk_prefix_strings(obj->t, s, cb_all_prefix_strings, list);
+		Py_INCREF(list);
+	}
+	return list;
 }
 
