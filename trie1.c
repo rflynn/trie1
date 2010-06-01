@@ -118,6 +118,11 @@ static struct trie1 * do_trie1_find_or_add(struct trie1 *parent, const wchar_t c
 			if (s == parent->child)
 				parent->child = n;
 		} else {
+			/* if it's an unattached \0 node it's the root;
+			 * we need to allocate a new one so we can modify it
+			 * without corrupting the trie. */
+			if (s == parent->child && !s->c && !s->next)
+				s = parent->child = trie1_alloc(L'\0');
 			n->next = s->next;
 			s->next = n;
 		}
@@ -130,7 +135,7 @@ void trie1_add(struct trie1 *t, const wchar_t *str)
 	struct trie1 *top = t;
 	while (*str)
 		t = do_trie1_find_or_add(t, *str++);
-	t->child = top; /* point all \0 at the same place. brilliant! */
+	t->child = top; /* point all new \0 at root. saves space. */
 }
 
 int trie1_find(const struct trie1 *t, const wchar_t *str)
@@ -192,12 +197,14 @@ void trie1_walk_prefix_strings(const struct trie1 *t, const wchar_t *str,
 	const wchar_t *ostr = str;
 	if (*str)
 		t = t->child;
-	do {
+	while (t) {
 		while (t && t->c < *str)
 			t = t->next;
-		if (t && t->child && !t->child->c) /* is full string */
-			f(ostr, (size_t)(str-ostr+1), pass); /* callback */
-	} while (t && *str && (t->c == *str++) && (t = t->child));
+		if (!t || t->c != *str || !t->child || t->child->c)
+			break;
+		f(ostr, (size_t)(str-ostr+1), pass); /* callback */
+		t = t->child, str++;
+	}
 }
 
 #ifdef DEBUG
